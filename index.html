@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hangman 🌺</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background-image: url('https://www.transparenttextures.com/patterns/flowers.png'), linear-gradient(135deg, #ffe0f0, #f0e7ff);
+      background-blend-mode: overlay;
+      background-size: cover;
+      font-family: 'Comic Sans MS', cursive, sans-serif;
+      color: #4a148c;
+      animation: backgroundGlow 10s ease-in-out infinite alternate;
+    }
+
+    @keyframes backgroundGlow {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 100% 50%; }
+    }
+
+    .floral-box {
+      background: rgba(255, 255, 255, 0.8);
+      border: 3px solid #f06292;
+      box-shadow: 0 0 15px #ff80ab, 0 0 30px #ffb3c6;
+      backdrop-filter: blur(10px);
+      transition: transform 0.3s ease;
+    }
+
+    .floral-box:hover {
+      transform: scale(1.01);
+    }
+
+    .neon-text {
+      color: #ec407a;
+      text-shadow: 0 0 5px #ff80ab, 0 0 10px #ff80ab, 0 0 15px #ff4081;
+      animation: glowText 2s ease-in-out infinite alternate;
+    }
+
+    @keyframes glowText {
+      0% { text-shadow: 0 0 5px #ff80ab; }
+      100% { text-shadow: 0 0 15px #ff4081; }
+    }
+
+    .letter-btn {
+      background: linear-gradient(135deg, #f8bbd0, #f48fb1);
+      color: #fff;
+      border: none;
+      border-radius: 9999px;
+      padding: 0.5rem 0.75rem;
+      font-weight: bold;
+      box-shadow: 0 4px 8px rgba(255, 105, 180, 0.5);
+      transition: all 0.2s ease;
+    }
+
+    .letter-btn:hover {
+      transform: scale(1.15);
+      box-shadow: 0 0 10px #ff80ab, 0 0 20px #f06292;
+    }
+
+    .letter-btn:disabled {
+      background: #ffcdd2;
+      color: #888;
+      cursor: not-allowed;
+    }
+
+    #hangman-img {
+      border: 4px dashed #f48fb1;
+      box-shadow: 0 0 10px #f06292;
+      border-radius: 1rem;
+      animation: floatImg 4s ease-in-out infinite;
+    }
+
+    @keyframes floatImg {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-6">
+  <div class="w-full max-w-xl text-center p-6 rounded-3xl floral-box">
+    <h1 class="text-5xl font-extrabold mb-4 neon-text">🌸 Floral Hangman 🌸</h1>
+
+    <div class="flex justify-between items-center mb-4 text-pink-700">
+      <label for="difficulty" class="text-sm font-medium">🎚️ Difficulty:</label>
+      <select id="difficulty" class="text-pink-900 rounded px-3 py-1 bg-pink-200" onchange="resetGame()">
+        <option value="easy">Easy</option>
+        <option value="hard">Hard</option>
+      </select>
+    </div>
+
+    <div class="text-pink-600 mb-2 text-lg">⏱️ Time Left: <span id="timer">60</span>s</div>
+    <div class="text-purple-600 mb-4 text-lg">🏆 Score: <span id="score">0</span></div>
+
+    <p class="text-2xl neon-text mb-2">Guess the word:</p>
+    <div id="word" class="text-4xl tracking-widest text-fuchsia-600 font-bold mb-4"></div>
+
+    <div id="hangman" class="mb-6">
+      <img id="hangman-img" src="images/0.jpg" alt="Hangman" class="mx-auto w-56 h-56 object-contain">
+    </div>
+
+    <div id="letters" class="grid grid-cols-7 gap-2 mb-6"></div>
+
+    <p id="status" class="text-xl font-semibold text-rose-600 mb-4"></p>
+
+    <button onclick="resetGame()" class="px-6 py-2 bg-pink-500 hover:bg-pink-700 rounded-full text-white font-bold shadow-lg transition-all">🔁 Restart</button>
+  </div>
+
+  <script>
+    const words = {
+      easy: ['cat', 'hat', 'sun', 'pen', 'book'],
+      hard: ['javascript', 'developer', 'hangman', 'tailwind', 'function']
+    };
+
+    let selectedWord = '', guessedLetters = [], wrongGuesses = 0, score = 0, timer;
+    const maxWrong = 6;
+    const wordDisplay = document.getElementById('word');
+    const lettersContainer = document.getElementById('letters');
+    const statusText = document.getElementById('status');
+    const timerEl = document.getElementById('timer');
+    const scoreEl = document.getElementById('score');
+    const hangmanImg = document.getElementById('hangman-img');
+
+    function chooseWord() {
+      const difficulty = document.getElementById('difficulty').value;
+      const wordList = words[difficulty];
+      selectedWord = wordList[Math.floor(Math.random() * wordList.length)];
+      guessedLetters = [];
+      wrongGuesses = 0;
+      updateDisplay();
+      createButtons();
+      statusText.textContent = '';
+      updateHangman();
+      startTimer();
+    }
+
+    function createButtons() {
+      lettersContainer.innerHTML = '';
+      for (let i = 65; i <= 90; i++) {
+        const btn = document.createElement('button');
+        btn.textContent = String.fromCharCode(i);
+        btn.className = "letter-btn";
+        btn.onclick = () => handleGuess(btn, String.fromCharCode(i).toLowerCase());
+        lettersContainer.appendChild(btn);
+      }
+    }
+
+    function handleGuess(button, letter) {
+      button.disabled = true;
+      if (selectedWord.includes(letter)) {
+        guessedLetters.push(letter);
+      } else {
+        wrongGuesses++;
+        updateHangman();
+      }
+      updateDisplay();
+      checkGameStatus();
+    }
+
+    function updateDisplay() {
+      wordDisplay.innerHTML = selectedWord.split('').map(letter => guessedLetters.includes(letter) ? letter : '_').join(' ');
+    }
+
+    function updateHangman() {
+      hangmanImg.src = `images/${wrongGuesses}.jpg`;
+    }
+
+    function checkGameStatus() {
+      if (wrongGuesses >= maxWrong) {
+        statusText.textContent = `💀 You lost! Word was: ${selectedWord}`;
+        disableAllButtons();
+        clearInterval(timer);
+      } else if (selectedWord.split('').every(letter => guessedLetters.includes(letter))) {
+        statusText.textContent = '🎉 You won!';
+        score += 10;
+        scoreEl.textContent = score;
+        clearInterval(timer);
+      }
+    }
+
+    function disableAllButtons() {
+      document.querySelectorAll('.letter-btn').forEach(btn => btn.disabled = true);
+    }
+
+    function resetGame() {
+      clearInterval(timer);
+      timerEl.textContent = 60;
+      chooseWord();
+    }
+
+    function startTimer() {
+      let timeLeft = 60;
+      timerEl.textContent = timeLeft;
+      timer = setInterval(() => {
+        timeLeft--;
+        timerEl.textContent = timeLeft;
+        if (timeLeft === 0) {
+          clearInterval(timer);
+          statusText.textContent = `⏰ Time's up! Word was: ${selectedWord}`;
+          disableAllButtons();
+        }
+      }, 1000);
+    }
+
+    chooseWord();
+  </script>
+</body>
+</html>
